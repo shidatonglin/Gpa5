@@ -112,7 +112,7 @@ extern int HoursBetween = 0;
 extern int MaPeriod = 5;
 extern int MaShift  = 2;
 extern int MaMode = MODE_SMMA;
-extern string EA_Comment = "bbMacd";
+extern string EA_Comment = "bbMacdv1.0";
 //--- inner variables
 
 int ThisBarTrade           =  0;
