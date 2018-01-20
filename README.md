@@ -1,1 +1,48 @@
 # Gpa5
+
+
+Learn mql5:
+
+USING THE OBJECT POINTERS IN MQL5
+https://www.mql5.com/en/articles/36
+
+THE ORDER OF OBJECT CREATION AND DESTRUCTION IN MQL5
+https://www.mql5.com/en/articles/28
+
+(How to debug mql5 program)
+STEP-BY-STEP GUIDE TO WRITING AN EXPERT ADVISOR IN MQL5 FOR BEGINNERS
+https://www.mql5.com/en/articles/100
+
+
+CONNECTION OF EXPERT ADVISOR WITH ICQ IN MQL5
+https://www.mql5.com/en/articles/64
+
+NEW OPPORTUNITIES WITH METATRADER 5
+https://www.mql5.com/en/articles/84
+
+OOP IN MQL5 BY EXAMPLE: PROCESSING WARNING AND ERROR CODES
+https://www.mql5.com/en/articles/70
+
+MQL FOR "DUMMIES": HOW TO DESIGN AND CONSTRUCT OBJECT CLASSES
+https://www.mql5.com/en/articles/53
+
+PRACTICAL APPLICATION OF DATABASES FOR MARKETS ANALYSIS
+https://www.mql5.com/en/articles/69
+
+MIGRATING FROM MQL4 TO MQL5
+https://www.mql5.com/en/articles/81
+
+A VIRTUAL ORDER MANAGER TO TRACK ORDERS WITHIN THE POSITION-CENTRIC METATRADER 5 ENVIRONMENT
+https://www.mql5.com/en/articles/88
+
+METATRADER 5: PUBLISHING TRADING FORECASTS AND LIVE TRADING STATEMENTS VIA E-MAIL ON BLOGS, SOCIAL NETWORKS AND DEDICATED WEBSITES
+https://www.mql5.com/en/articles/80
+
+CREATING A "SNAKE" GAME IN MQL5
+https://www.mql5.com/en/articles/65
+
+CREATING TICK INDICATORS IN MQL5
+https://www.mql5.com/en/articles/60
+
+MQL5: CREATE YOUR OWN INDICATOR
+https://www.mql5.com/en/articles/10
