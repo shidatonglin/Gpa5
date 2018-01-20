@@ -2,6 +2,17 @@
 //|                                                  MACD Sample.mq5 |
 //|                   Copyright 2009-2017, MetaQuotes Software Corp. |
 //|                                              http://www.mql5.com |
+//|
+//| Buy : MACD value below the zero line 
+//|       MACD value start to bigger than the macd signal value.
+//|       MA(26) current value bigger than previous value
+//|       MACD value bigger than the open value
+//|
+//| Sell: MACD value over the zero line
+//|       MACD value start to smaller than the macd signal value.
+//|       MA(26) current value smaller than previous value
+//|       MACD value bigger than the open value
+//|
 //+------------------------------------------------------------------+
 #property copyright   "Copyright 2009-2017, MetaQuotes Software Corp."
 #property link        "http://www.mql5.com"
@@ -18,8 +29,8 @@
 #include <Trade\PositionInfo.mqh>
 #include <Trade\AccountInfo.mqh>
 //---
-input double InpLots          =0.1; // Lots
-input int    InpTakeProfit    =50;  // Take Profit (in pips)
+input double InpLots          =0.01; // Lots
+input int    InpTakeProfit    =40;  // Take Profit (in pips)
 input int    InpTrailingStop  =30;  // Trailing Stop Level (in pips)
 input int    InpMACDOpenLevel =3;   // MACD open level (in pips)
 input int    InpMACDCloseLevel=2;   // MACD close level (in pips)
@@ -301,6 +312,10 @@ bool CSampleExpert::LongOpened(void)
   {
    bool res=false;
 //--- check for long position (BUY) possibility
+// MACD value below the zero line and start to bigger than the signal line(diff value 
+//   moving average)
+// Ma value bigger than the previous one
+// MACD current value bigger than the open value
    if(m_macd_current<0)
       if(m_macd_current>m_signal_current && m_macd_previous<m_signal_previous)
          if(MathAbs(m_macd_current)>(m_macd_open_level) && m_ema_current>m_ema_previous)
