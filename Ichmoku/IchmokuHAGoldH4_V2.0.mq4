@@ -216,7 +216,7 @@ int getSignal(string name){
   double IchomuC = iIchimoku(name, Low_TF , 12 , 29 , 52 , 3 , shift);
   double IchomuD = iIchimoku(name, Low_TF , 12 , 29 , 52 , 4 , shift);
   // HA close value
-  double haClose = iCustom(name, Low_TF, "Heiken Ashi", 0,0,0,0, 3, 1);
+  double haClose = iCustom(name, Low_TF, "Heiken Ashi", 0,0,0,0, 3, shift);
 
   if(haClose > IchomuC && haClose > IchomuD){
     ichomuTrendLowTF = 1;
@@ -228,8 +228,8 @@ int getSignal(string name){
 
   // Two MA channels
   int maChannelCross = 0;
-  double maHigh = iMA( name, Low_TF, MaPeriod, MaShift, MaMode, PRICE_HIGH, 1);
-  double maLow = iMA( name, Low_TF, MaPeriod, MaShift, MaMode, PRICE_LOW, 1);
+  double maHigh = iMA( name, Low_TF, MaPeriod, MaShift, MaMode, PRICE_HIGH, shift);
+  double maLow = iMA( name, Low_TF, MaPeriod, MaShift, MaMode, PRICE_LOW, shift);
   if(haClose > maHigh) maChannelCross = 1;
   if(haClose < maLow) maChannelCross = -1;
   //--- Signals
@@ -250,9 +250,9 @@ int getExitSignal(string name){
   
   // Two MA channels
   int maChannelCross = 0;
-  double maHigh = iMA( name, Low_TF, MaPeriod, MaShift, MaMode, PRICE_HIGH, 1);
-  double maLow = iMA( name, Low_TF, MaPeriod, MaShift, MaMode, PRICE_LOW, 1);
-  double haClose = iCustom(name, Low_TF, "Heiken Ashi", 0,0,0,0, 3, 1);
+  double maHigh = iMA( name, Low_TF, MaPeriod, MaShift, MaMode, PRICE_HIGH, shift);
+  double maLow = iMA( name, Low_TF, MaPeriod, MaShift, MaMode, PRICE_LOW, shift);
+  double haClose = iCustom(name, Low_TF, "Heiken Ashi", 0,0,0,0, 3, shift);
   if(haClose > maHigh) maChannelCross = 1;
   if(haClose < maLow) maChannelCross = -1;
   
