@@ -361,14 +361,14 @@ int getSignalStrategy3(string name){
 int getExitSignal(string name){
   
   // Two MA channels
-  int maChannelCross = 0;
-  double maHigh = iMA( name, Low_TF, MaPeriod, MaShift, MaMode, PRICE_HIGH, shift);
-  double maLow = iMA( name, Low_TF, MaPeriod, MaShift, MaMode, PRICE_LOW, shift);
-  double haClose = iCustom(name, Low_TF, "Heiken Ashi", 0,0,0,0, 3, shift);
-  if(haClose > maHigh) maChannelCross = 1;
-  if(haClose < maLow) maChannelCross = -1;
+  // int maChannelCross = 0;
+  // double maHigh = iMA( name, Low_TF, MaPeriod, MaShift, MaMode, PRICE_HIGH, shift);
+  // double maLow = iMA( name, Low_TF, MaPeriod, MaShift, MaMode, PRICE_LOW, shift);
+  // double haClose = iCustom(name, Low_TF, "Heiken Ashi", 0,0,0,0, 3, shift);
+  // if(haClose > maHigh) maChannelCross = 1;
+  // if(haClose < maLow) maChannelCross = -1;
   
-  return maChannelCross;
+  return getMaChannalSignal(name);
 }
 
 void open_buy(string name){
