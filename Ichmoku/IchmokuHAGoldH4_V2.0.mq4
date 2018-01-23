@@ -69,7 +69,7 @@ double sl_p = 0;                                    //Raw pips offset
 
 extern double pf = 20;                             //Targeted profit factor (x times SL)
 
-extern bool trail_mode = false;                      //Enable trailing
+extern bool trail_mode = true;                      //Enable trailing
 extern double tf = 0.8;                             //Trailing factor (x times Sl)
 
 enum mm     {classic        //Classic
