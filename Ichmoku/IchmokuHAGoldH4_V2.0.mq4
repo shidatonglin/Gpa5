@@ -498,7 +498,7 @@ void open_sell(string name){
   int result = 0;
   double mlots = getOrderLots(name);
   string short_comment = "HA_SMA-short on strategy_" + IntegerToString(strategy);
-  result=OrderSend(Symbol(),OP_SELL,mlots,MarketInfo(name, MODE_BID),Slippage,0,0,short_comment,MagicNumber,0,Magenta);
+  result=OrderSend(name,OP_SELL,mlots,MarketInfo(name, MODE_BID),Slippage,0,0,short_comment,MagicNumber,0,Magenta);
   if(result>0){
     //Comment("\n   This Bar has already been traded");
     double TP = 0, SL = 0;
@@ -674,12 +674,12 @@ double sqHeikenAshi(string symbol, int timeframe, string mode) {
 */
 
 //--- stats
-int getLastOrderOpenTime(){
+int getLastOrderOpenTime(string name){
   int result=0;
   for(int i=0;i<OrdersTotal();i++)
   {
      OrderSelect(i,SELECT_BY_POS ,MODE_TRADES);
-     if (OrderMagicNumber()==MagicNumber && OrderSymbol()==Symbol()) result = OrderOpenTime();
+     if (OrderMagicNumber()==MagicNumber && OrderSymbol()==name) result = OrderOpenTime();
    }
   return (result);
 }
