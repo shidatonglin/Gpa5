@@ -210,13 +210,30 @@ int getAvailableCurrencyPairs(string& availableCurrencyPairs[], const bool selec
  * return value : -1:down, 1:up, 0: none
  */
 int getSignal(string name){
-  // Original
-  // Ichomu + Machannal
-  if(strategy == 1) return getSignalStrategy1(name);
-  // Ichomu + Machannal + BB_macd
-  if(strategy == 2) return getSignalStrategy2(name);
-  // BB_macd 
-  if(strategy == 3) return getSignalStrategy3(name);
+// Original
+// Ichomu + Machannal
+// Everytime if HA close price bigger than ichomu high cloud and ma channal high
+// Then open buy
+   if(strategy == 1) return getSignalStrategy1(name);
+// Ichomu + Machannal + BB_macd
+// Base strategy 1, add filter when buy, bb_macd should blue
+// when sell bb_macd should red
+   if(strategy == 2) return getSignalStrategy2(name);
+// BB_macd 
+// Everytime when bb_macd value cross up/down its upper band or lower band
+// and price be higher or lower than the ma channel high or low
+   if(strategy == 3) return getSignalStrategy3(name);
+
+// Ma channel cross
+// Buy:
+//     Everytime when HA close price cross up ma channel high
+//     Ha close price higher than Ichomu upper cloud
+//     BB macd should be blue
+// Sell:
+//     Everytime when HA close price cross down ma channel low
+//     Ha close price lower than Ichomu bottom cloud
+//     BB macd should be blue
+   if(strategy == 4) return getSignalStrategy4(name);
 
   return 0;
 }
@@ -239,6 +256,36 @@ int getIchomuTrendSignal(string name){
   return ichomuTrendLowTF;
 }
 
+int getIchomuCrossSignal(string name)
+  {
+   int ichomuTrendLowTF=0;
+   double IchomuC = iIchimoku(name, Low_TF , 12 , 29 , 52 , 3 , shift);
+   double IchomuD = iIchimoku(name, Low_TF , 12 , 29 , 52 , 4 , shift);
+// HA close value
+   double haClose=iCustom(name,Low_TF,"Heiken Ashi",0,0,0,0,3,shift);
+
+   double pre_IchomuC = iIchimoku(name, Low_TF , 12 , 29 , 52 , 3 , shift+1);
+   double pre_IchomuD = iIchimoku(name, Low_TF , 12 , 29 , 52 , 4 , shift+1);
+// HA close value
+   double pre_haClose=iCustom(name,Low_TF,"Heiken Ashi",0,0,0,0,3,shift+1);
+
+//if((haClose > IchomuC && haClose > IchomuD)
+//   && (pre_haClose<pre_IchomuC || pre_haClose<pre_IchomuD)){
+//  ichomuTrendLowTF = 1;
+//}
+
+   if(haClose>MathMax(IchomuC,IchomuD)
+      && pre_haClose<MathMax(pre_IchomuC,pre_IchomuD))ichomuTrendLowTF=1;
+
+   if(haClose<MathMin(IchomuC,IchomuD)
+      && pre_haClose>MathMin(pre_IchomuC,pre_IchomuD))ichomuTrendLowTF=-1;
+
+//if(haClose < IchomuC && haClose < IchomuD){
+//  ichomuTrendLowTF = -1;
+//}
+   return ichomuTrendLowTF;
+  }
+
 int getMaChannalSignal(string name){
   // Two MA channels
   int maChannelCross = 0;
@@ -249,6 +296,21 @@ int getMaChannalSignal(string name){
   if(haClose < maLow) maChannelCross = -1;
   return maChannelCross;
 }
+
+int getMaChannalCrossSignal(string name)
+  {
+   int maChannelCross=0;
+   double maHigh= iMA(name,Low_TF,MaPeriod,MaShift,MaMode,PRICE_HIGH,shift);
+   double maLow = iMA(name,Low_TF,MaPeriod,MaShift,MaMode,PRICE_LOW,shift);
+   double haClose=iCustom(name,Low_TF,"Heiken Ashi",0,0,0,0,3,shift);
+   double pre_maHigh= iMA(name,Low_TF,MaPeriod,MaShift,MaMode,PRICE_HIGH,shift+1);
+   double pre_maLow = iMA(name,Low_TF,MaPeriod,MaShift,MaMode,PRICE_LOW,shift+1);
+   double pre_haClose=iCustom(name,Low_TF,"Heiken Ashi",0,0,0,0,3,shift+1);
+
+   if(haClose>maHigh && pre_haClose<pre_maHigh) maChannelCross=1;
+   if(haClose<maLow  &&  pre_haClose>pre_maLow) maChannelCross=-1;
+   return maChannelCross;
+  }
 
 int getMacdValueSignal(string name){
   int macd_signal = 0;
@@ -376,6 +438,25 @@ int getSignalStrategy3(string name){
   if (r_signal) signal_2 = -signal_1;
   return signal_2;
 }
+
+int getSignalStrategy4(string name)
+  {
+
+   int bb_macd_signal=getBBmacdValueSignal(name);
+// Two MA channels
+   int maChannelCross=getMaChannalCrossSignal(name);
+   int ichomuSignal=getIchomuTrendSignal(name);
+//--- Signals
+
+   int signal_1=0,signal_2=0;
+
+   if( bb_macd_signal == 1 && maChannelCross == 1 && ichomuSignal==1) signal_1 = 1;
+   if( bb_macd_signal == -1 && maChannelCross == -1 && ichomuSignal==-1) signal_1 = -1;
+
+   signal_2=signal_1;
+   if(r_signal) signal_2=-signal_1;
+   return signal_2;
+  }
 
 int getExitSignal(string name){
   
