@@ -60,7 +60,7 @@ Time Frame: H4
 */
 
 //--- external variables
-
+extern int strategy  = 1;
 extern double atr_p = 15;                           //ATR/HiLo period for dynamic SL/TP/TS
 extern double atr_x = 1;                            //ATR weight in SL/TP/TS
 extern int    atr_tf = 240;
@@ -189,29 +189,41 @@ void checkForClose(string name){
 int getAvailableCurrencyPairs(string& availableCurrencyPairs[], const bool selected=false)
 {
 //---   
-   const int symbolsCount = SymbolsTotal(selected);
-   int currencypairsCount;
-   ArrayResize(availableCurrencyPairs, symbolsCount);
-   int idxCurrencyPair = 0;
-   for(int idxSymbol = 0; idxSymbol < symbolsCount; idxSymbol++)
-     {      
-         string symbol = SymbolName(idxSymbol, selected);
-         string firstChar = StringSubstr(symbol, 0, 1);
-         if(firstChar != "#" && StringLen(symbol) == 6)
-           {        
-               availableCurrencyPairs[idxCurrencyPair++] = symbol; 
-           } 
-     }
-     currencypairsCount = idxCurrencyPair;
-     ArrayResize(availableCurrencyPairs, currencypairsCount);
-     return currencypairsCount;
+  const int symbolsCount = SymbolsTotal(selected);
+  int currencypairsCount;
+  ArrayResize(availableCurrencyPairs, symbolsCount);
+  int idxCurrencyPair = 0;
+  for(int idxSymbol = 0; idxSymbol < symbolsCount; idxSymbol++)
+   {      
+      string symbol = SymbolName(idxSymbol, selected);
+      string firstChar = StringSubstr(symbol, 0, 1);
+      if(firstChar != "#" && StringLen(symbol) == 6)
+        {        
+          availableCurrencyPairs[idxCurrencyPair++] = symbol; 
+        } 
+  }
+  currencypairsCount = idxCurrencyPair;
+  ArrayResize(availableCurrencyPairs, currencypairsCount);
+  return currencypairsCount;
 }
 
 /*
  * return value : -1:down, 1:up, 0: none
  */
 int getSignal(string name){
-  //Lower TF ichimoku
+  // Original
+  // Ichomu + Machannal
+  if(strategy == 1) return getSignalStrategy1(name);
+  // Ichomu + Machannal + BB_macd
+  if(strategy == 2) return getSignalStrategy2(name);
+  // BB_macd 
+  if(strategy == 3) return getSignalStrategy3(name);
+
+  return 0;
+}
+
+
+int getIchomuTrendSignal(string name){
   int ichomuTrendLowTF = 0;
   double IchomuC = iIchimoku(name, Low_TF , 12 , 29 , 52 , 3 , shift);
   double IchomuD = iIchimoku(name, Low_TF , 12 , 29 , 52 , 4 , shift);
@@ -225,26 +237,126 @@ int getSignal(string name){
   if(haClose < IchomuC && haClose < IchomuD){
     ichomuTrendLowTF = -1;
   }
+  return ichomuTrendLowTF;
+}
 
+int getMaChannalSignal(string name){
   // Two MA channels
   int maChannelCross = 0;
   double maHigh = iMA( name, Low_TF, MaPeriod, MaShift, MaMode, PRICE_HIGH, shift);
   double maLow = iMA( name, Low_TF, MaPeriod, MaShift, MaMode, PRICE_LOW, shift);
+  double haClose = iCustom(name, Low_TF, "Heiken Ashi", 0,0,0,0, 3, shift);
   if(haClose > maHigh) maChannelCross = 1;
   if(haClose < maLow) maChannelCross = -1;
+  return maChannelCross;
+}
+
+int getBBmacdValueSignal(string name){
+  int bb_macd_signal = 0;
+  double curUp= iCustom( NULL, Low_TF, "PakuAK_Marblez", 12,26,10,1.0, 0, shift);
+  double curDown = iCustom( NULL, Low_TF, "PakuAK_Marblez", 12,26,10,1.0, 1, shift);
+  double curUpBand = iCustom( NULL, Low_TF, "PakuAK_Marblez", 12,26,10,1.0, 2, shift);
+  double curDownBand = iCustom( NULL, Low_TF, "PakuAK_Marblez", 12,26,10,1.0, 3, shift);
+
+  if(curUp==EMPTY_VALUE) {bb_macd_signal=-1;}
+  if(curDown==EMPTY_VALUE) {bb_macd_signal=1;}
+  return bb_macd_signal;
+}
+
+int getBBmacdCrossSignal(string name){
+  int bb_macd_signal = 0;
+  double preValue,curValue;
+  double preUp= iCustom( NULL, Low_TF, "PakuAK_Marblez", 12,26,10,1.0, 0, 1+shift);
+  double preDown = iCustom( NULL, Low_TF, "PakuAK_Marblez", 12,26,10,1.0, 1, 1+shift);
+  double preUpBand = iCustom( NULL, Low_TF, "PakuAK_Marblez", 12,26,10,1.0, 2, 1+shift);
+  double preDownBand = iCustom( NULL, Low_TF, "PakuAK_Marblez", 12,26,10,1.0, 3, 1+shift);
+
+  if(preUp==EMPTY_VALUE) preValue = preDown;
+  if(preDown==EMPTY_VALUE) preValue = preUp;
+
+  double curUp= iCustom( NULL, Low_TF, "PakuAK_Marblez", 12,26,10,1.0, 0, shift);
+  double curDown = iCustom( NULL, Low_TF, "PakuAK_Marblez", 12,26,10,1.0, 1, shift);
+  double curUpBand = iCustom( NULL, Low_TF, "PakuAK_Marblez", 12,26,10,1.0, 2, shift);
+  double curDownBand = iCustom( NULL, Low_TF, "PakuAK_Marblez", 12,26,10,1.0, 3, shift);
+
+  if(curUp==EMPTY_VALUE) curValue = curDown;
+  if(curDown==EMPTY_VALUE) curValue = curUp;
+
+  if(preValue > 0 && curValue > 0){
+    if(curValue > curUpBand && preValue < preUpBand){
+      bb_macd_signal=1;
+    }
+  }
+
+  if(preValue < 0 && curValue < 0){
+    if(curValue < curDownBand && preValue > preDownBand){
+      bb_macd_signal=-1;
+    }
+  }
+  return bb_macd_signal;
+}
+
+// Ichomu + Machannal
+int getSignalStrategy1(string name){
+  //Lower TF ichimoku
+  int ichomuTrendLowTF = getIchomuTrendSignal(name);
+
+  // Two MA channels
+  int maChannelCross = getMaChannalSignal(name);
   //--- Signals
 
-  int signal_1 = 0, signal_2 = 0, direction = 0;
-  bool is_trend = false, cross = false;
+  int signal_1 = 0, signal_2 = 0;
    
   if ( ichomuTrendLowTF == 1 && maChannelCross == 1) signal_1 = 1;
   if ( ichomuTrendLowTF == -1 && maChannelCross == -1) signal_1 = -1;
 
   signal_2 = signal_1;
-  if (r_signal==true) signal_2 = -signal_1;
+  if (r_signal) signal_2 = -signal_1;
   return signal_2;
 }
 
+// Ichomu + Machannal + BB_macd
+int getSignalStrategy2(string name){
+
+  //Lower TF ichimoku
+  int ichomuTrendLowTF = getIchomuTrendSignal(name);
+
+  // Two MA channels
+  int maChannelCross = getMaChannalSignal(name);
+
+  // BB macd current value 
+  int bb_macd_signal = getBBmacdValueSignal(name);
+  //--- Signals
+
+  int signal_1 = 0, signal_2 = 0;
+   
+  if ( ichomuTrendLowTF == 1 && maChannelCross == 1 && bb_macd_signal==1) signal_1 = 1;
+  if ( ichomuTrendLowTF == -1 && maChannelCross == -1 && bb_macd_signal==-1) signal_1 = -1;
+
+  signal_2 = signal_1;
+  if (r_signal) signal_2 = -signal_1;
+  return signal_2;
+}
+// BB_macd
+int getSignalStrategy3(string name){
+  //Lower TF ichimoku
+  //int ichomuTrendLowTF = getIchomuTrendSignal(name);
+
+  int bb_macd_signal = getBBmacdCrossSignal(name);
+
+  // Two MA channels
+  int maChannelCross = getMaChannalSignal(name);
+  //--- Signals
+
+  int signal_1 = 0, signal_2 = 0;
+   
+  if ( bb_macd_signal == 1 && maChannelCross == 1) signal_1 = 1;
+  if ( bb_macd_signal == -1 && maChannelCross == -1) signal_1 = -1;
+
+  signal_2 = signal_1;
+  if (r_signal) signal_2 = -signal_1;
+  return signal_2;
+}
 
 int getExitSignal(string name){
   
