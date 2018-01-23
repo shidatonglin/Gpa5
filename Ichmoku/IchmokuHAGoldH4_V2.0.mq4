@@ -96,7 +96,7 @@ extern color color3 = Turquoise;                    //EA's profit color
 extern color color4 = Magenta;                      //EA's loss color
 
 extern int Slippage = 3;                          
-extern int MagicNumber = 20170909;                       //Magic
+extern int MagicNumber = 20180123;                       //Magic
 
 extern int High_TF  = 1440;
 extern int Low_TF   = 240;
@@ -109,7 +109,6 @@ extern int MaShift  = 2;
 extern int MaMode = MODE_SMMA;
 //--- inner variables
 
-int ThisBarTrade           =  0;
 string version = "0.2";
 
 double max_acc_dd = 0;
@@ -249,6 +248,26 @@ int getMaChannalSignal(string name){
   if(haClose > maHigh) maChannelCross = 1;
   if(haClose < maLow) maChannelCross = -1;
   return maChannelCross;
+}
+
+int getMacdValueSignal(string name){
+  int macd_signal = 0;
+  double main_value = iMACD(name,0,12,26,9,PRICE_CLOSE,MODE_MAIN,shift);
+  double signal_value = iMACD(name,0,12,26,9,PRICE_CLOSE,MODE_SIGNAL,shift);
+  if(main_value > signal_value && main_value > 0) macd_signal = 1;
+  if(main_value < signal_value && main_value < 0) macd_signal = -1;
+  return macd_signal;
+}
+
+int getMacdCrossSignal(string name){
+  int macd_signal = 0;
+  double pre_main_value = iMACD(name,0,12,26,9,PRICE_CLOSE,MODE_MAIN,shift+1);
+  double pre_signal_value = iMACD(name,0,12,26,9,PRICE_CLOSE,MODE_SIGNAL,shift+1);
+  double main_value = iMACD(name,0,12,26,9,PRICE_CLOSE,MODE_MAIN,shift);
+  double signal_value = iMACD(name,0,12,26,9,PRICE_CLOSE,MODE_SIGNAL,shift);
+  if(main_value>0 && main_value > signal_value && pre_main_value < pre_signal_value) macd_signal = 1;
+  if(main_value<0 && main_value < signal_value && pre_main_value > pre_signal_value) macd_signal = -1;
+  return macd_signal;
 }
 
 int getBBmacdValueSignal(string name){
