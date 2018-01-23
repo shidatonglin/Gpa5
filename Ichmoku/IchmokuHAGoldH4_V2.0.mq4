@@ -60,7 +60,7 @@ Time Frame: H4
 */
 
 //--- external variables
-extern int strategy  = 1;
+extern int strategy  = 2;
 extern double atr_p = 15;                           //ATR/HiLo period for dynamic SL/TP/TS
 extern double atr_x = 1;                            //ATR weight in SL/TP/TS
 extern int    atr_tf = 240;
