@@ -374,7 +374,7 @@ int getExitSignal(string name){
 void open_buy(string name){
   int result = 0;
   double mlots = getOrderLots(name);
-  string long_comment = "HA_SMA-long on strategy " + IntegerToString(strategy);
+  string long_comment = "HA_SMA-long on strategy_" + IntegerToString(strategy);
   result=OrderSend(name,OP_BUY,mlots,MarketInfo(name, MODE_ASK),Slippage,0,0,long_comment,MagicNumber,0,Turquoise);
   if(result>0){
     //log("IchomuA=="+IchomuA + " IchomuB==" + IchomuB + " Close[shift]==>"+Close[shift] + "ichomuTrend=="+ichomuTrend);
@@ -397,7 +397,7 @@ void open_buy(string name){
 void open_sell(string name){
   int result = 0;
   double mlots = getOrderLots(name);
-  string short_comment = "HA_SMA-short on strategy " + IntegerToString(strategy);
+  string short_comment = "HA_SMA-short on strategy_" + IntegerToString(strategy);
   result=OrderSend(Symbol(),OP_SELL,mlots,MarketInfo(name, MODE_BID),Slippage,0,0,short_comment,MagicNumber,0,Magenta);
   if(result>0){
     //Comment("\n   This Bar has already been traded");
