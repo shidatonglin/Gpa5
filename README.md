@@ -55,3 +55,60 @@ https://www.mql5.com/en/articles/648
 
 MQL5 COOKBOOK - MULTI-CURRENCY EXPERT ADVISOR AND WORKING WITH PENDING ORDERS IN MQL5
 https://www.mql5.com/en/articles/755
+
+MQL5 COOKBOOK: 把交易历史写入文件以及为每个交易品种在EXCEL中创建余额图表
+https://www.mql5.com/zh/articles/651
+
+利用 MQL5 面向对象编程法编写"EA 交易"
+https://www.mql5.com/zh/articles/116
+
+MQL5 COOKBOOK: 多币种EA交易 - 简洁而快速的途径
+https://www.mql5.com/zh/articles/648
+
+MQL5 COOKBOOK: 使用不限数量的参数开发多币种EA交易
+https://www.mql5.com/zh/articles/650
+
+
+面向对象法建立多时间表及多货币面板
+https://www.mql5.com/zh/articles/357
+
+面向对象编程基础
+https://www.mql5.com/zh/articles/351
+
+利用MQL5创建您自己的图形面板
+https://www.mql5.com/zh/articles/345
+
+
+MT5文章整理
+https://www.mql5.com/zh/blogs/post/713550
+MQL5 向导：如何教导 EA 以任意价格建立挂单
+https://www.mql5.com/zh/articles/723
+源代码的跟踪、调试和结构分析
+https://www.mql5.com/zh/articles/272
+
+
+MQL5 编程基础：字符串
+https://www.mql5.com/zh/articles/585
+MQL5 编程基础：时间
+https://www.mql5.com/zh/articles/599
+MQL5 编程基础：数组
+https://www.mql5.com/zh/articles/567
+MQL5 编程基础: 文件
+https://www.mql5.com/zh/articles/2720
+MQL5 编程基础: 终端中的全局变量
+https://www.mql5.com/zh/articles/2744
+https://www.mql5.com/zh/articles/1210
+MQL5 编程基础：列表
+https://www.mql5.com/zh/articles/709
+
+
+
+
+
+
+
+
+
+
+
+
