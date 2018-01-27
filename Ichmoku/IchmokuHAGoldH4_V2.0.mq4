@@ -60,7 +60,16 @@ Time Frame: H4
 */
 
 //--- external variables
-extern int strategy  = 2;
+extern bool enableTrade = true;                    // Enable EA
+extern bool basketTrade = true;                    // BasketTrade or not
+enum Trade_Mode {
+  HA_Ichomu,
+  HA_Ichomu_BBmacd,
+  BB_macd_cross,
+  MA_Channel_Cross,
+  MACDCross
+};
+extern Trade_Mode strategy  = HA_Ichomu_BBmacd;
 extern double atr_p = 15;                           //ATR/HiLo period for dynamic SL/TP/TS
 extern double atr_x = 1;                            //ATR weight in SL/TP/TS
 extern int    atr_tf = 240;
@@ -158,15 +167,27 @@ int start(){
   //   Popup();
   //   Earnings();
   // }
+  
   // trail stop
   if(trail_mode) trail_stop();
+
+  if(!enableTrade) return;
+
   // New bar, check open
   if(preTime < Time[0]){
     // New bar generated
-    for(int index=0; index <  ArraySize( pairs ); index++){
-      if(TotalOrdersCount(pairs[index]) > 0) checkForClose(pairs[index]);
-      else checkForOpen(pairs[index]);
+    if(basketTrade){
+      int total_pairs = ArraySize( pairs );
+      for(int index=0; index <  total_pairs; index++){
+        if(TotalOrdersCount(pairs[index]) > 0) checkForClose(pairs[index]);
+        else checkForOpen(pairs[index]);
+      }
+    } else {
+      string currentSymbol = Symbol();
+      if(TotalOrdersCount(currentSymbol) > 0) checkForClose(currentSymbol);
+      else checkForOpen(currentSymbol);
     }
+    
     preTime = Time[0];
   }
   return(0);
@@ -214,15 +235,17 @@ int getSignal(string name){
 // Ichomu + Machannal
 // Everytime if HA close price bigger than ichomu high cloud and ma channal high
 // Then open buy
-   if(strategy == 1) return getSignalStrategy1(name);
+   if(strategy == HA_Ichomu) return getSignalStrategy1(name);
+
 // Ichomu + Machannal + BB_macd
 // Base strategy 1, add filter when buy, bb_macd should blue
 // when sell bb_macd should red
-   if(strategy == 2) return getSignalStrategy2(name);
+   if(strategy == HA_Ichomu_BBmacd) return getSignalStrategy2(name);
+
 // BB_macd 
 // Everytime when bb_macd value cross up/down its upper band or lower band
 // and price be higher or lower than the ma channel high or low
-   if(strategy == 3) return getSignalStrategy3(name);
+   if(strategy == BB_macd_cross) return getSignalStrategy3(name);
 
 // Ma channel cross
 // Buy:
@@ -233,7 +256,15 @@ int getSignal(string name){
 //     Everytime when HA close price cross down ma channel low
 //     Ha close price lower than Ichomu bottom cloud
 //     BB macd should be blue
-   if(strategy == 4) return getSignalStrategy4(name);
+   if(strategy == MA_Channel_Cross) return getSignalStrategy4(name);
+
+   // Strategy 5
+   // Only for index CDFs currently.
+   // Macd value > 0 and current value > current signal value 
+   //                and previous value < previous signal value---->buy
+   // Macd value < 0 and current value < current signal value 
+   //                and previous value > previous signal value---->sell
+   if(strategy == MACDCross) return getSignalStrategy5(name);
 
   return 0;
 }
@@ -452,6 +483,25 @@ int getSignalStrategy4(string name)
 
    if( bb_macd_signal == 1 && maChannelCross == 1 && ichomuSignal==1) signal_1 = 1;
    if( bb_macd_signal == -1 && maChannelCross == -1 && ichomuSignal==-1) signal_1 = -1;
+
+   signal_2=signal_1;
+   if(r_signal) signal_2=-signal_1;
+   return signal_2;
+  }
+
+int getSignalStrategy5(string name)
+  {
+
+   int macd_signal=getMacdCrossSignal(name);
+// Two MA channels
+   //int maChannelCross=getMaChannalCrossSignal(name);
+   //int ichomuSignal=getIchomuTrendSignal(name);
+//--- Signals
+
+   int signal_1=0,signal_2=0;
+
+   if( macd_signal == 1 ) signal_1 = 1;
+   if( macd_signal == -1 ) signal_1 = -1;
 
    signal_2=signal_1;
    if(r_signal) signal_2=-signal_1;
@@ -924,7 +974,7 @@ int TotalOrdersCount(string name=NULL)
   for(int i=0;i<OrdersTotal();i++)
   {
      OrderSelect(i,SELECT_BY_POS ,MODE_TRADES);
-     if (OrderMagicNumber()==MagicNumber && OrderSymbol()==name) result++;
+     if (OrderMagicNumber()==MagicNumber && (name==NULL || OrderSymbol()==name)) result++;
    }
   return (result);
 }
