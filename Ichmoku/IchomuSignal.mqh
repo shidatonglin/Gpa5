@@ -92,7 +92,7 @@ protected:
 };
 
 CMACD::CMACD(void) : m_period_fast(12),
-                     m_period_slow(24),
+                     m_period_slow(26),
                      m_period_signal(9),
                      m_applied(PRICE_CLOSE){  
    
@@ -174,7 +174,9 @@ class CHeikenAshi : public CSignal{
       virtual           SIGNAL_DIRECTION getCrossSignal(int ind);
 };
 
-CHeikenAshi :: CHeikenAshi(void){
+CHeikenAshi :: CHeikenAshi(void) : m_tenkan_sen(12),
+                                   m_kijun_sen(29),
+                                   m_senkou_span_b(52) {
 }
 
 CHeikenAshi :: ~CHeikenAshi(void){
@@ -265,7 +267,7 @@ class CMAChannel : public CSignal{
 };
 
 CMAChannel :: CMAChannel(void):m_ma_period(5)
-                              ,m_ma_shift(0)
+                              ,m_ma_shift(2)
                               ,m_ma_method(MODE_SMMA){
    
 }
@@ -396,8 +398,12 @@ SIGNAL_DIRECTION CBbMacd :: getCrossSignal(int ind){
 class CStrategy {
    private:
    protected:
-      CSignal * m_signal;
-      int       m_mode;
+      CSignal *      m_signal;
+      CMACD          m_signal_macd;
+      CBbMacd        m_signal_bbmacd;
+      CMAChannel     m_signal_machannel;
+      CHeikenAshi    m_signal_cheikenashi;
+      int            m_mode;
    public:
       CStrategy(void):m_mode(2){}
       ~CStrategy(void){delete m_signal;}
@@ -411,7 +417,49 @@ SIGNAL_DIRECTION CStrategy :: GetSignal(){
 }
 
 SIGNAL_DIRECTION CStrategy :: GetSignal(int mode){
-   if(mode == 1) m_signal = new CMACD();
-   if(mode == 2) m_signal = new CHeikenAshi();
+   switch(mode){
+      case 1 :
+         m_signal_cheikenashi.InitSignal();
+         m_signal_machannel.InitSignal();
+         if(m_signal_machannel.getMainValueSignal(1) == 1
+            && m_signal_cheikenashi.getMainValueSignal(1) == 1) return DIRECTION_BUY;
+         if(m_signal_machannel.getMainValueSignal(1) == -1
+            && m_signal_cheikenashi.getMainValueSignal(1) == -1) return DIRECTION_SELL;
+         break;
+      case 2 :
+         m_signal_cheikenashi.InitSignal();
+         m_signal_machannel.InitSignal();
+         m_signal_bbmacd.InitSignal();
+         if(m_signal_machannel.getMainValueSignal(1) == 1
+            && m_signal_cheikenashi.getMainValueSignal(1) == 1
+            && m_signal_bbmacd.getMainValueSignal(1) == 1) return DIRECTION_BUY;
+         if(m_signal_machannel.getMainValueSignal(1) == -1
+            && m_signal_cheikenashi.getMainValueSignal(1) == -1
+            && m_signal_bbmacd.getMainValueSignal(1) == -1) return DIRECTION_SELL;
+         break;
+      case 3 :
+         m_signal_machannel.InitSignal();
+         m_signal_bbmacd.InitSignal();
+         if(m_signal_machannel.getMainValueSignal(1) == 1
+            && m_signal_bbmacd.getCrossSignal(1) == 1){
+            return DIRECTION_BUY;
+         }
+         if(m_signal_machannel.getMainValueSignal(1) == -1
+            && m_signal_bbmacd.getCrossSignal(1) == -1){
+            return DIRECTION_SELL;
+         }
+         break;
+      case 4 :
+         m_signal_machannel.InitSignal();
+         m_signal_bbmacd.InitSignal();
+         m_signal_cheikenashi.InitSignal();
+         if(m_signal_machannel.getCrossSignal(1)==1
+            && m_signal_bbmacd.getMainValueSignal(1)==1
+            && m_signal_cheikenashi.getMainValueSignal(1)==1) return DIRECTION_BUY;
+         if(m_signal_machannel.getCrossSignal(1)==-1
+            && m_signal_bbmacd.getMainValueSignal(1)==-1
+            && m_signal_cheikenashi.getMainValueSignal(1)==-1) return DIRECTION_SELL;
+         break;
+   }
    return DIRECTION_NONE;
 }
