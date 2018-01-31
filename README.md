@@ -101,6 +101,16 @@ https://www.mql5.com/zh/articles/1210
 MQL5 编程基础：列表
 https://www.mql5.com/zh/articles/709
 
+MQL5 WIZARD: HOW TO CREATE A MODULE OF TRADING SIGNALS
+https://www.mql5.com/en/articles/226
+
+CREATING MULTI-EXPERT ADVISORS ON THE BASIS OF TRADING MODELS
+https://www.mql5.com/en/articles/217
+
+https://www.mql5.com/en/code/324
+
+https://www.mql5.com/en/code/301
+
 
 
 
