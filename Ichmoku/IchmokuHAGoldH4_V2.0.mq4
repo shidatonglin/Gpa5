@@ -63,11 +63,11 @@ Time Frame: H4
 extern bool enableTrade = true;                    // Enable EA
 extern bool basketTrade = true;                    // BasketTrade or not
 enum Trade_Mode {
-  HA_Ichomu,
-  HA_Ichomu_BBmacd,
-  BB_macd_cross,
-  MA_Channel_Cross,
-  MACDCross
+  HA_Ichomu        =1,
+  HA_Ichomu_BBmacd =2,
+  BB_macd_cross    =3,
+  MA_Channel_Cross =4,
+  MACDCross        =5
 };
 extern Trade_Mode strategy  = HA_Ichomu_BBmacd;
 extern double atr_p = 15;                           //ATR/HiLo period for dynamic SL/TP/TS
@@ -105,7 +105,7 @@ extern color color3 = Turquoise;                    //EA's profit color
 extern color color4 = Magenta;                      //EA's loss color
 
 extern int Slippage = 3;                          
-extern int MagicNumber = 20180123;                       //Magic
+extern int MagicNumber = 20180207;                       //Magic
 
 extern int High_TF  = 1440;
 extern int Low_TF   = 240;
@@ -138,7 +138,8 @@ string pairs[];
 //---
 
 int init() {
-  getAvailableCurrencyPairs(pairs);
+  //getAvailableCurrencyPairs(pairs);
+  Assign28SymbolToList(pairs);
   if(!UseCurrent) shift = 1;
    return (0);
 }
@@ -167,7 +168,7 @@ int start(){
   //   Popup();
   //   Earnings();
   // }
-  
+  if(gui)printTradePairs(pairs);
   // trail stop
   if(trail_mode) trail_stop();
 
@@ -193,10 +194,25 @@ int start(){
   return(0);
 }
 
+void printTradePairs(string& myPairs[]){
+  string text = "";
+  for(int i=0;i<ArraySize(myPairs);i++){
+     text = text + myPairs[i] + " , ";
+     if(i%10==0) text = text + "\n";
+  }
+  Comment(text);
+}
+
+
 void checkForOpen(string name){
   int signal = getSignal(name);
   if(signal == 1) open_buy(name);
   else if(signal == -1) open_sell(name);
+}
+
+bool checkSpread(string name){
+
+  return true;
 }
 
 void checkForClose(string name){
@@ -682,6 +698,82 @@ void calculateStopLoss(string name, double &SLp, double &TPp, double &TSp){
   TSp = NormalizeDouble(tf*(SLp),MarketInfo (name, MODE_DIGITS)); //0.8 SLP
 
 }
+//+------------------------------------------------------------------+
+bool VerifySymbol(string &list[],string yoursymbol)
+  {
+   for(int i=0;i<ArraySize(list);i++)
+     {
+      if(yoursymbol==list[i])
+        {
+         return(true);
+        }
+     }
+   return(false);
+  }
+//+------------------------------------------------------------------+
+//|                                                                  |
+//+------------------------------------------------------------------+
+void Assign28SymbolToList(string &array[])
+  {
+//EURUSD
+//GBPUSD
+//AUDUSD
+//NZDUSD
+//USDCAD
+//USDJPY
+//USDCHF
+   array[0]="EURUSD";
+   array[1]="GBPUSD";
+   array[2]="AUDUSD";
+   array[3]="NZDUSD";
+   array[4]="USDCAD";
+   array[5]="USDJPY";
+   array[6]="USDCHF";
+//EURGBP
+//EURAUD
+//EURNZD
+//EURCAD
+//EURJPY
+//EURCHF
+   array[7]="EURGBP";
+   array[8]="EURAUD";
+   array[9]="EURNZD";
+   array[10]="EURCAD";
+   array[11]="EURJPY";
+   array[12]="EURCHF";
+//GBPAUD
+//GBPNZD
+//GBPCAD
+//GBPJPY
+//GBPCHF
+   array[13]="GBPAUD";
+   array[14]="GBPNZD";
+   array[15]="GBPCAD";
+   array[16]="GBPJPY";
+   array[17]="GBPCHF";
+
+//AUDNZD
+//AUDCAD
+//AUDJPY
+//AUDCHF
+   array[18]="AUDNZD";
+   array[19]="AUDCAD";
+   array[20]="AUDJPY";
+   array[21]="AUDCHF";
+//NZDCAD
+//NZDJPY
+//NZDCHF
+   array[22]="NZDCAD";
+   array[23]="NZDJPY";
+   array[24]="NZDCHF";
+//CHFJPY
+//CADCHF
+//CADJPY
+   array[25]="CHFJPY";
+   array[26]="CADCHF";
+   array[27]="CADJPY";
+  }
+//+------------------------------------------------------------------+
 //----------------------------------------------------------------------------
 
 double sqHeikenAshi(string symbol, int timeframe, string mode) {
