@@ -172,7 +172,7 @@ int start(){
   // trail stop
   if(trail_mode) trail_stop();
 
-  if(!enableTrade) return;
+  if(!enableTrade) return(0);
 
   // New bar, check open
   if(preTime < Time[0]){
