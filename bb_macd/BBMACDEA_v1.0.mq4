@@ -112,7 +112,7 @@ extern int HoursBetween = 0;
 extern int MaPeriod = 5;
 extern int MaShift  = 2;
 extern int MaMode = MODE_SMMA;
-extern string EA_Comment = "bbMacd";
+extern string EA_Comment = "bbMacdv1.0";
 //--- inner variables
 
 int ThisBarTrade           =  0;
@@ -251,17 +251,25 @@ int start(){
     if(curUp==EMPTY_VALUE) curValue = curDown;
     if(curDown==EMPTY_VALUE) curValue = curUp;
 
-    if(preValue > 0 && curValue > 0){
-      if(curValue > curUpBand && preValue < preUpBand){
-        bb_macd_signal=1;
-      }
+    if(curValue > 0 && curValue > curUpBand){
+      bb_macd_signal=1;
     }
 
-    if(preValue < 0 && curValue < 0){
-      if(curValue < curDownBand && preValue > preDownBand){
-        bb_macd_signal=-1;
-      }
+    if(curValue < 0 && curValue < curDownBand){
+      bb_macd_signal=-1;
     }
+
+    // if(preValue > 0 && curValue > 0){
+    //   if(curValue > curUpBand && preValue < preUpBand){
+    //     bb_macd_signal=1;
+    //   }
+    // }
+
+    // if(preValue < 0 && curValue < 0){
+    //   if(curValue < curDownBand && preValue > preDownBand){
+    //     bb_macd_signal=-1;
+    //   }
+    // }
 
 
     //Lower TF ichimoku
@@ -291,8 +299,16 @@ int start(){
     int signal_1 = 0, signal_2 = 0, direction = 0;
     bool is_trend = false, cross = false;
 
-    if ( bb_macd_signal == 1 && maChannelCross == 1) signal_1 = 1;
-    if ( bb_macd_signal == -1 && maChannelCross == -1) signal_1 = -1;
+    if ( bb_macd_signal == 1 && maChannelCross == 1) {
+      if(getLastSignalIndex(1) < 3){
+        signal_1 = 1;
+      }
+    }
+    if ( bb_macd_signal == -1 && maChannelCross == -1) {
+      if(getLastSignalIndex(-1) < 3){
+        signal_1 = -1;
+      }
+    }
    
     signal_2 = signal_1;
    
@@ -309,6 +325,8 @@ int start(){
             "curDown==EMPTY_VALUE--->"+(curDown==EMPTY_VALUE) + "\n"
             "bb_macd_signal--->"+(bb_macd_signal) + "\n"
             "maChannelCross--->"+(maChannelCross) + "\n"
+            "getLastSignalIndex(1)--->"+(getLastSignalIndex(1)) + "\n"
+            "getLastSignalIndex(-1)--->"+(getLastSignalIndex(-1)) + "\n"
             "signal_1--->"+(signal_1) + "\n"
             );
   if (r_signal==true) signal_2 = -signal_1;
@@ -365,6 +383,55 @@ int start(){
 
         return(0);
      }
+  }
+
+  int getLastSignalIndex(int direction){
+    for(int i=shift;i<20;i++){
+      // Two MA channels
+      double maHigh = iMA( NULL, Low_TF, MaPeriod, MaShift, MaMode, PRICE_HIGH, i);
+      double maLow = iMA( NULL, Low_TF, MaPeriod, MaShift, MaMode, PRICE_LOW, i);
+      if(direction == 1 && haClose < maHigh) return i;
+      if(direction == -1 && haClose > maLow) return i;
+
+      double preValue,curValue;
+      double preUp= iCustom( NULL, Low_TF, "PakuAK_Marblez", 12,26,10,1.0, 0, 1+i);
+      double preDown = iCustom( NULL, Low_TF, "PakuAK_Marblez", 12,26,10,1.0, 1, 1+i);
+      double preUpBand = iCustom( NULL, Low_TF, "PakuAK_Marblez", 12,26,10,1.0, 2, 1+i);
+      double preDownBand = iCustom( NULL, Low_TF, "PakuAK_Marblez", 12,26,10,1.0, 3, 1+i);
+
+      if(preUp==EMPTY_VALUE) preValue = preDown;
+      if(preDown==EMPTY_VALUE) preValue = preUp;
+
+      double curUp= iCustom( NULL, Low_TF, "PakuAK_Marblez", 12,26,10,1.0, 0, i);
+      double curDown = iCustom( NULL, Low_TF, "PakuAK_Marblez", 12,26,10,1.0, 1, i);
+      double curUpBand = iCustom( NULL, Low_TF, "PakuAK_Marblez", 12,26,10,1.0, 2, i);
+      double curDownBand = iCustom( NULL, Low_TF, "PakuAK_Marblez", 12,26,10,1.0, 3, i);
+
+      if(curUp==EMPTY_VALUE) curValue = curDown;
+      if(curDown==EMPTY_VALUE) curValue = curUp;
+
+      if(direction == 1 && curValue > curUpBand && preValue < preUpBand){
+        return i;
+      }
+      if(direction == 1 && curValue < curDownBand && preValue > curDownBand){
+        return i;
+      }
+      return 20;
+    }
+    
+
+    // if(preValue > 0 && curValue > 0){
+    //   if(curValue > curUpBand && preValue < preUpBand){
+    //     bb_macd_signal=1;
+    //   }
+    // }
+
+    // if(preValue < 0 && curValue < 0){
+    //   if(curValue < curDownBand && preValue > preDownBand){
+    //     bb_macd_signal=-1;
+    //   }
+    // }
+    
   }
 
 /*       ________________________________________________

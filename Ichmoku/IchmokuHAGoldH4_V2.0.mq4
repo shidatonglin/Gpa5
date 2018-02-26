@@ -13,8 +13,7 @@
 
 #property copyright     "shidatonglin"
 #property link          "shidatonglin@gmail.com (mp me on FF rather than by email)"
-#property description   "RSIOMA Ichomu"
-#property version       "0.1"
+#property description   "Gold H4 Ichomu"
 #property strict
 
 /*
@@ -61,11 +60,16 @@ Time Frame: H4
 */
 
 //--- external variables
-
-//extern int adx_ln = 50;                             //ADX p
-//extern int adxma_ln = 25;                           //ADXMA p
-//extern ENUM_MA_METHOD adxma_type = MODE_SMA;        //ADXMA type
-
+extern bool enableTrade = true;                    // Enable EA
+extern bool basketTrade = true;                    // BasketTrade or not
+enum Trade_Mode {
+  HA_Ichomu        =1,
+  HA_Ichomu_BBmacd =2,
+  BB_macd_cross    =3,
+  MA_Channel_Cross =4,
+  MACDCross        =5
+};
+extern Trade_Mode strategy  = HA_Ichomu_BBmacd;
 extern double atr_p = 15;                           //ATR/HiLo period for dynamic SL/TP/TS
 extern double atr_x = 1;                            //ATR weight in SL/TP/TS
 extern int    atr_tf = 240;
@@ -101,7 +105,7 @@ extern color color3 = Turquoise;                    //EA's profit color
 extern color color4 = Magenta;                      //EA's loss color
 
 extern int Slippage = 3;                          
-extern int MagicNumber = 20180112;                       //Magic
+extern int MagicNumber = 20180207;                       //Magic
 
 extern int High_TF  = 1440;
 extern int Low_TF   = 240;
@@ -112,10 +116,8 @@ extern int HoursBetween = 0;
 extern int MaPeriod = 5;
 extern int MaShift  = 2;
 extern int MaMode = MODE_SMMA;
-extern string EA_Comment = "bbMacd";
 //--- inner variables
 
-int ThisBarTrade           =  0;
 string version = "0.2";
 
 double max_acc_dd = 0;
@@ -131,16 +133,19 @@ int max_chain_loss = 0;
 int shift = 0;
 int spread = 0;
 int lastOrderTime = 0;
+
+string pairs[];
 //---
 
 int init() {
+  //getAvailableCurrencyPairs(pairs);
+  Assign28SymbolToList(pairs);
   if(!UseCurrent) shift = 1;
    return (0);
 }
 
 int deinit() {
   if(ObjectFind( "HUD" )>=0)ObjectDelete( "HUD" );
-  if(ObjectFind( "displaySignal" )>=0)ObjectDelete( "displaySignal" );
   int obj_total=ObjectsTotal();
   PrintFormat("Total %d objects",obj_total);
   for(int i=obj_total-1;i>=0;i--)
@@ -155,287 +160,623 @@ int deinit() {
    return (0);
 }
 
-//---
-
-/*       ________________________________________________
-         T                                              T
-         T               ON TICK FUNCTION               T
-         T______________________________________________T
-*/
+datetime preTime = 0;
 
 int start(){
-  drawInfo();             
-  if (gui) {
-    HUD();
-    Popup();
-    Earnings();
-  }
+  // if (gui) {
+  //   HUD();
+  //   Popup();
+  //   Earnings();
+  // }
+  if(gui)printTradePairs(pairs);
+  // trail stop
+  if(trail_mode) trail_stop();
 
-  if (Bars != ThisBarTrade ) {// To avoid more order in one bar!
-    double spread = MarketInfo(Symbol(), MODE_SPREAD) * Point;
-    double pt = MarketInfo (Symbol(), MODE_POINT);
-//--- Max DD calculation
-//--- ATR for Sl / HiLo MA for SL
-    int atrTf = atr_tf;
-    double atr1 = iATR(NULL,atrTf,atr_p,0);// Period 15
-    double atr2 = iATR(NULL,atrTf,2*atr_p,0);// Period 30
-    double atr3 = NormalizeDouble(((atr1+atr2)/2)*atr_x,Digits);// Atr weight 1 in SL?TP/TSL
-   
-    double ma1 = iMA(NULL,atrTf,atr_p*2,0,MODE_LWMA,PRICE_HIGH,0);// 30 MA High
-    double ma2 = iMA(NULL,atrTf,atr_p*2,0,MODE_LWMA,PRICE_LOW,0);// 30 Ma Low
-    double ma3 = NormalizeDouble(hilo_x*(ma1 - ma2),Digits);// HiLo weight 0.5 in SL/TP/TSL
+  if(!enableTrade) return(0);
 
-//--- SL & TP calculation 
-    double sl_p1 = NormalizeDouble(Point*sl_p/((1/(Close[0]+(spread/2)))),Digits);
-    double SLp = sl_p1 + atr3 + ma3;// (atr15+atr30)/2 + (ma30High-ma30Low)/2
-    double TPp = NormalizeDouble(pf*(SLp),Digits); // 3.5 SLP
-    double TSp = NormalizeDouble(tf*(SLp),Digits); //0.8 SLP
-   
-//--- Win / Loss Counter
-    int WinCount = Counta(6);
-    int LossCount = Counta(5);
-
-//--- Money Management
-
-    double mlots=0;
-     
-    switch(mm_mode){
-
-      //Martingale
-         case mart: if (OrdersHistoryTotal()!=0) mlots=NormalizeDouble(blots*(MathPow(cator,(LossCount))),2); else mlots = blots; break;
-         
-      //Reversed Martingale
-         case r_mart: if (OrdersHistoryTotal()!=0) mlots=NormalizeDouble(blots*(MathPow(cator,(WinCount))),2); else mlots = blots; break;
-         
-      //Scale after loss (Fixed)
-         case scale: if (OrdersHistoryTotal()!=0) mlots=blots+(f_inc*WinCount); else mlots = blots; break;
-         
-      //Scale after win (Fixed)
-         case r_scale: if (OrdersHistoryTotal()!=0) mlots=blots+(f_inc*LossCount); else mlots = blots; break;
-         
-      //Classic
-         case classic: mlots = blots; break;
-    };
-
-    double IchomuA = iIchimoku(NULL, High_TF , 12 , 29 , 52 , 3 , shift);
-    double IchomuB = iIchimoku(NULL, High_TF , 12 , 29 , 52 , 4 , shift);
-
-    int ichomuTrend = 0;
-    if(Close[shift] > IchomuA && Close[shift] > IchomuB){
-      ichomuTrend = 1;
-    }
-    if(Close[shift] < IchomuA && Close[shift] < IchomuB){
-      ichomuTrend = -1;
-    }
-
-    //RSIOMA siginal
-    // ExtMapBuffer1[i]=bbMacd[i];   //Uptrend bbMacd
-    // ExtMapBuffer2[i]=bbMacd[i];   // downtrend bbMacd
-    // ExtMapBuffer3[i]=Upperband[i];// Upperband
-    // ExtMapBuffer4[i]=Lowerband[i];//Lowerband
-    int bb_macd_signal = 0;
-    double preValue,curValue;
-    double preUp= iCustom( NULL, Low_TF, "PakuAK_Marblez", 12,26,10,1.0, 0, 1+shift);
-    double preDown = iCustom( NULL, Low_TF, "PakuAK_Marblez", 12,26,10,1.0, 1, 1+shift);
-    double preUpBand = iCustom( NULL, Low_TF, "PakuAK_Marblez", 12,26,10,1.0, 2, 1+shift);
-    double preDownBand = iCustom( NULL, Low_TF, "PakuAK_Marblez", 12,26,10,1.0, 3, 1+shift);
-
-    if(preUp==EMPTY_VALUE) preValue = preDown;
-    if(preDown==EMPTY_VALUE) preValue = preUp;
-
-    double curUp= iCustom( NULL, Low_TF, "PakuAK_Marblez", 12,26,10,1.0, 0, shift);
-    double curDown = iCustom( NULL, Low_TF, "PakuAK_Marblez", 12,26,10,1.0, 1, shift);
-    double curUpBand = iCustom( NULL, Low_TF, "PakuAK_Marblez", 12,26,10,1.0, 2, shift);
-    double curDownBand = iCustom( NULL, Low_TF, "PakuAK_Marblez", 12,26,10,1.0, 3, shift);
-
-    if(curUp==EMPTY_VALUE) curValue = curDown;
-    if(curDown==EMPTY_VALUE) curValue = curUp;
-
-    if(preValue > 0 && curValue > 0){
-      if(curValue > curUpBand && preValue < preUpBand){
-        bb_macd_signal=1;
+  // New bar, check open
+  if(preTime < Time[0]){
+    // New bar generated
+    if(basketTrade){
+      int total_pairs = ArraySize( pairs );
+      for(int index=0; index <  total_pairs; index++){
+        if(TotalOrdersCount(pairs[index]) > 0) checkForClose(pairs[index]);
+        else checkForOpen(pairs[index]);
       }
+    } else {
+      string currentSymbol = Symbol();
+      if(TotalOrdersCount(currentSymbol) > 0) checkForClose(currentSymbol);
+      else checkForOpen(currentSymbol);
     }
-
-    if(preValue < 0 && curValue < 0){
-      if(curValue < curDownBand && preValue > preDownBand){
-        bb_macd_signal=-1;
-      }
-    }
-
-
-    //Lower TF ichimoku
-    int ichomuTrendLowTF = 0;
-    double IchomuC = iIchimoku(NULL, Low_TF , 12 , 29 , 52 , 3 , shift);
-    double IchomuD = iIchimoku(NULL, Low_TF , 12 , 29 , 52 , 4 , shift);
-    // HA close value
-    double haClose = iCustom(NULL, Low_TF, "Heiken Ashi", 0,0,0,0, 3, shift);
-
-    if(haClose > IchomuC && haClose > IchomuD){
-      ichomuTrendLowTF = 1;
-    }
-
-    if(haClose < IchomuC && haClose < IchomuD){
-      ichomuTrendLowTF = -1;
-    }
-
-    // Two MA channels
-    int maChannelCross = 0;
-    double maHigh = iMA( NULL, Low_TF, MaPeriod, MaShift, MaMode, PRICE_HIGH, shift);
-    double maLow = iMA( NULL, Low_TF, MaPeriod, MaShift, MaMode, PRICE_LOW, shift);
-    if(haClose > maHigh) maChannelCross = 1;
-    if(haClose < maLow) maChannelCross = -1;
-
-    //--- Signals
-
-    int signal_1 = 0, signal_2 = 0, direction = 0;
-    bool is_trend = false, cross = false;
-
-    if ( bb_macd_signal == 1 && maChannelCross == 1) signal_1 = 1;
-    if ( bb_macd_signal == -1 && maChannelCross == -1) signal_1 = -1;
-   
-    signal_2 = signal_1;
-   
-    Comment("preUp--->"+preUp + "\n"
-            "preDown--->"+preDown + "\n"
-            "preUpBand--->"+preUpBand + "\n"
-            "preDownBand--->"+preDownBand + "\n"
-            "curUp--->"+curUp + "\n"
-            "curDown--->"+curDown + "\n"
-            "curUpBand--->"+curUpBand + "\n"
-            "curDownBand--->"+curDownBand + "\n"
-            "curValue--->"+curValue + "\n"
-            "preValue--->"+preValue + "\n"
-            "curDown==EMPTY_VALUE--->"+(curDown==EMPTY_VALUE) + "\n"
-            "bb_macd_signal--->"+(bb_macd_signal) + "\n"
-            "maChannelCross--->"+(maChannelCross) + "\n"
-            "signal_1--->"+(signal_1) + "\n"
-            );
-  if (r_signal==true) signal_2 = -signal_1;
-   
-/*       ________________________________________________
-         T                                              T
-         T                 ENTRY RULES                  T
-         T______________________________________________T
-*/
-
-  if( TotalOrdersCount() < MaxTrade ) 
-  {
-     lastOrderTime = getLastOrderOpenTime();
-     int result=0;
-     //--- Long
-     if(signal_2==1 && (lastOrderTime==0 || sqGetBarsFromOrderOpen(lastOrderTime) >= HoursBetween))
-     {
-        result=OrderSend(Symbol(),OP_BUY,mlots,Ask,Slippage,0,0,EA_Comment+"- long "+DoubleToStr(mlots,2)+" on "+Symbol(),MagicNumber,0,Turquoise);
-        if(result>0)
-        {
-         ThisBarTrade = Bars;
-         //lastOrderTime = TimeCurrent();
-         //Comment("\n   This Bar has already been traded");
-         ObjectDelete(version + "98");
-         ObjectDelete(version + "100");
-         //log("IchomuA=="+IchomuA + " IchomuB==" + IchomuB + " Close[shift]==>"+Close[shift] + "ichomuTrend=="+ichomuTrend);
-         double TP = 0, SL = 0;
-         if(TPp>0) TP=Ask+TPp;
-         if(SLp>0) SL=Ask-SLp;
-         OrderSelect(result,SELECT_BY_TICKET);
-         OrderModify(OrderTicket(),OrderOpenPrice(),NormalizeDouble(SL,Digits),NormalizeDouble(TP,Digits),0,Green);
-        }
-
-        return(0);
-     }
-     //--- Short rule
-     if(signal_2==-1 && (lastOrderTime==0 || sqGetBarsFromOrderOpen(lastOrderTime) >= HoursBetween))
-     {   
-        result=OrderSend(Symbol(),OP_SELL,mlots,Bid,Slippage,0,0,EA_Comment+" - short "+DoubleToStr(mlots,2)+" on "+Symbol(),MagicNumber,0,Magenta);
-        if(result>0)
-        {
-         ThisBarTrade = Bars;
-         //lastOrderTime = TimeCurrent();
-         //Comment("\n   This Bar has already been traded");
-         ObjectDelete(version + "98");
-         ObjectDelete(version + "100");
-         
-         double TP = 0, SL = 0;
-         if(TPp>0) TP=Bid-TPp;
-         if(SLp>0) SL=Bid+SLp;
-         OrderSelect(result,SELECT_BY_TICKET);
-         OrderModify(OrderTicket(),OrderOpenPrice(),NormalizeDouble(SL,Digits),NormalizeDouble(TP,Digits),0,Green);
-        }
-
-        return(0);
-     }
+    
+    preTime = Time[0];
   }
-
-/*       ________________________________________________
-         T                                              T
-         T            EXIT RULES & TRAILING             T
-         T______________________________________________T
-*/
-  
-  for(int cnt=0;cnt<OrdersTotal();cnt++)
-     {
-      OrderSelect(cnt, SELECT_BY_POS, MODE_TRADES);
-      if(OrderType()<=OP_SELL &&   
-         OrderSymbol()==Symbol() &&
-         OrderMagicNumber()==MagicNumber 
-         )  
-        {
-        //--- Close long
-         if(OrderType()==OP_BUY)  
-           {
-              if((maChannelCross == -1) || (close_range==true && is_trend==false) || (close_r==true && direction==-1) )
-              {
-                   OrderClose(OrderTicket(),OrderLots(),OrderClosePrice(),Slippage,Red);
-                   ThisBarTrade = Bars;
-                   ObjectDelete(version + "98");
-                   ObjectDelete(version + "100");
-              }
-            if(TSp>0 && trail_mode==true)
-              {                 
-               if(Bid-OrderOpenPrice()>TSp)
-                 {
-                  if(OrderStopLoss()<Bid-TSp)
-                    {
-                     OrderModify(OrderTicket(),OrderOpenPrice(),Bid-TSp,OrderTakeProfit(),0,Turquoise);
-                     ThisBarTrade = Bars;
-                     return(0);
-                    }
-                 }
-              }
-           }
-        //--- Close Short
-         if(OrderType()==OP_SELL) 
-           {
-              if((maChannelCross == 1) || (close_range==true && is_trend==false) || (close_r==true && direction==1) )
-              {
-                 OrderClose(OrderTicket(),OrderLots(),OrderClosePrice(),Slippage,Red);
-                 ThisBarTrade = Bars;
-                 ObjectDelete(version + "98");
-                 ObjectDelete(version + "100");
-              }
-            if(TSp>0 && trail_mode==true)  
-              {                 
-               if((OrderOpenPrice()-Ask)>(TSp))
-                 {
-                  if((OrderStopLoss()>(Ask+TSp)) || (OrderStopLoss()==0))
-                    {
-                     OrderModify(OrderTicket(),OrderOpenPrice(),Ask+TSp,OrderTakeProfit(),0,Magenta);
-                     ThisBarTrade = Bars;
-                     return(0);
-                    }
-                 }
-              }
-           }
-        }
-     }
-  }
-    return(0);
+  return(0);
 }
 
+void printTradePairs(string& myPairs[]){
+  string text = "";
+  for(int i=0;i<ArraySize(myPairs);i++){
+     text = text + myPairs[i] + " , ";
+     if(i%10==0) text = text + "\n";
+  }
+  Comment(text);
+}
+
+
+void checkForOpen(string name){
+  int signal = getSignal(name);
+  if(signal == 1) open_buy(name);
+  else if(signal == -1) open_sell(name);
+}
+
+bool checkSpread(string name){
+
+  return true;
+}
+
+void checkForClose(string name){
+  int exit_signal = getExitSignal(name);
+  if(exit_signal == -1) close_buy(name);
+  if(exit_signal == 1) close_sell(name);
+}
+
+//+------------------------------------------------------------------+
+int getAvailableCurrencyPairs(string& availableCurrencyPairs[], const bool selected=false)
+{
+//---   
+  const int symbolsCount = SymbolsTotal(selected);
+  int currencypairsCount;
+  ArrayResize(availableCurrencyPairs, symbolsCount);
+  int idxCurrencyPair = 0;
+  for(int idxSymbol = 0; idxSymbol < symbolsCount; idxSymbol++)
+   {      
+      string symbol = SymbolName(idxSymbol, selected);
+      string firstChar = StringSubstr(symbol, 0, 1);
+      if(firstChar != "#" && StringLen(symbol) == 6)
+        {        
+          availableCurrencyPairs[idxCurrencyPair++] = symbol; 
+        } 
+  }
+  currencypairsCount = idxCurrencyPair;
+  ArrayResize(availableCurrencyPairs, currencypairsCount);
+  return currencypairsCount;
+}
+
+/*
+ * return value : -1:down, 1:up, 0: none
+ */
+int getSignal(string name){
+// Original
+// Ichomu + Machannal
+// Everytime if HA close price bigger than ichomu high cloud and ma channal high
+// Then open buy
+   if(strategy == HA_Ichomu) return getSignalStrategy1(name);
+
+// Ichomu + Machannal + BB_macd
+// Base strategy 1, add filter when buy, bb_macd should blue
+// when sell bb_macd should red
+   if(strategy == HA_Ichomu_BBmacd) return getSignalStrategy2(name);
+
+// BB_macd 
+// Everytime when bb_macd value cross up/down its upper band or lower band
+// and price be higher or lower than the ma channel high or low
+   if(strategy == BB_macd_cross) return getSignalStrategy3(name);
+
+// Ma channel cross
+// Buy:
+//     Everytime when HA close price cross up ma channel high
+//     Ha close price higher than Ichomu upper cloud
+//     BB macd should be blue
+// Sell:
+//     Everytime when HA close price cross down ma channel low
+//     Ha close price lower than Ichomu bottom cloud
+//     BB macd should be blue
+   if(strategy == MA_Channel_Cross) return getSignalStrategy4(name);
+
+   // Strategy 5
+   // Only for index CDFs currently.
+   // Macd value > 0 and current value > current signal value 
+   //                and previous value < previous signal value---->buy
+   // Macd value < 0 and current value < current signal value 
+   //                and previous value > previous signal value---->sell
+   if(strategy == MACDCross) return getSignalStrategy5(name);
+
+  return 0;
+}
+
+
+int getIchomuTrendSignal(string name){
+  int ichomuTrendLowTF = 0;
+  double IchomuC = iIchimoku(name, Low_TF , 12 , 29 , 52 , 3 , shift);
+  double IchomuD = iIchimoku(name, Low_TF , 12 , 29 , 52 , 4 , shift);
+  // HA close value
+  double haClose = iCustom(name, Low_TF, "Heiken Ashi", 0,0,0,0, 3, shift);
+
+  if(haClose > IchomuC && haClose > IchomuD){
+    ichomuTrendLowTF = 1;
+  }
+
+  if(haClose < IchomuC && haClose < IchomuD){
+    ichomuTrendLowTF = -1;
+  }
+  return ichomuTrendLowTF;
+}
+
+int getIchomuCrossSignal(string name)
+  {
+   int ichomuTrendLowTF=0;
+   double IchomuC = iIchimoku(name, Low_TF , 12 , 29 , 52 , 3 , shift);
+   double IchomuD = iIchimoku(name, Low_TF , 12 , 29 , 52 , 4 , shift);
+// HA close value
+   double haClose=iCustom(name,Low_TF,"Heiken Ashi",0,0,0,0,3,shift);
+
+   double pre_IchomuC = iIchimoku(name, Low_TF , 12 , 29 , 52 , 3 , shift+1);
+   double pre_IchomuD = iIchimoku(name, Low_TF , 12 , 29 , 52 , 4 , shift+1);
+// HA close value
+   double pre_haClose=iCustom(name,Low_TF,"Heiken Ashi",0,0,0,0,3,shift+1);
+
+//if((haClose > IchomuC && haClose > IchomuD)
+//   && (pre_haClose<pre_IchomuC || pre_haClose<pre_IchomuD)){
+//  ichomuTrendLowTF = 1;
+//}
+
+   if(haClose>MathMax(IchomuC,IchomuD)
+      && pre_haClose<MathMax(pre_IchomuC,pre_IchomuD))ichomuTrendLowTF=1;
+
+   if(haClose<MathMin(IchomuC,IchomuD)
+      && pre_haClose>MathMin(pre_IchomuC,pre_IchomuD))ichomuTrendLowTF=-1;
+
+//if(haClose < IchomuC && haClose < IchomuD){
+//  ichomuTrendLowTF = -1;
+//}
+   return ichomuTrendLowTF;
+  }
+
+int getMaChannalSignal(string name){
+  // Two MA channels
+  int maChannelCross = 0;
+  double maHigh = iMA( name, Low_TF, MaPeriod, MaShift, MaMode, PRICE_HIGH, shift);
+  double maLow = iMA( name, Low_TF, MaPeriod, MaShift, MaMode, PRICE_LOW, shift);
+  double haClose = iCustom(name, Low_TF, "Heiken Ashi", 0,0,0,0, 3, shift);
+  if(haClose > maHigh) maChannelCross = 1;
+  if(haClose < maLow) maChannelCross = -1;
+  return maChannelCross;
+}
+
+int getMaChannalCrossSignal(string name)
+  {
+   int maChannelCross=0;
+   double maHigh= iMA(name,Low_TF,MaPeriod,MaShift,MaMode,PRICE_HIGH,shift);
+   double maLow = iMA(name,Low_TF,MaPeriod,MaShift,MaMode,PRICE_LOW,shift);
+   double haClose=iCustom(name,Low_TF,"Heiken Ashi",0,0,0,0,3,shift);
+   double pre_maHigh= iMA(name,Low_TF,MaPeriod,MaShift,MaMode,PRICE_HIGH,shift+1);
+   double pre_maLow = iMA(name,Low_TF,MaPeriod,MaShift,MaMode,PRICE_LOW,shift+1);
+   double pre_haClose=iCustom(name,Low_TF,"Heiken Ashi",0,0,0,0,3,shift+1);
+
+   if(haClose>maHigh && pre_haClose<pre_maHigh) maChannelCross=1;
+   if(haClose<maLow  &&  pre_haClose>pre_maLow) maChannelCross=-1;
+   return maChannelCross;
+  }
+
+int getMacdValueSignal(string name){
+  int macd_signal = 0;
+  double main_value = iMACD(name,0,12,26,9,PRICE_CLOSE,MODE_MAIN,shift);
+  double signal_value = iMACD(name,0,12,26,9,PRICE_CLOSE,MODE_SIGNAL,shift);
+  if(main_value > signal_value && main_value > 0) macd_signal = 1;
+  if(main_value < signal_value && main_value < 0) macd_signal = -1;
+  return macd_signal;
+}
+
+int getMacdCrossSignal(string name){
+  int macd_signal = 0;
+  double pre_main_value = iMACD(name,0,12,26,9,PRICE_CLOSE,MODE_MAIN,shift+1);
+  double pre_signal_value = iMACD(name,0,12,26,9,PRICE_CLOSE,MODE_SIGNAL,shift+1);
+  double main_value = iMACD(name,0,12,26,9,PRICE_CLOSE,MODE_MAIN,shift);
+  double signal_value = iMACD(name,0,12,26,9,PRICE_CLOSE,MODE_SIGNAL,shift);
+  if(main_value>0 && main_value > signal_value && pre_main_value < pre_signal_value) macd_signal = 1;
+  if(main_value<0 && main_value < signal_value && pre_main_value > pre_signal_value) macd_signal = -1;
+  return macd_signal;
+}
+
+int getBBmacdValueSignal(string name){
+  int bb_macd_signal = 0;
+  double curUp= iCustom( NULL, Low_TF, "PakuAK_Marblez", 12,26,10,1.0, 0, shift);
+  double curDown = iCustom( NULL, Low_TF, "PakuAK_Marblez", 12,26,10,1.0, 1, shift);
+  double curUpBand = iCustom( NULL, Low_TF, "PakuAK_Marblez", 12,26,10,1.0, 2, shift);
+  double curDownBand = iCustom( NULL, Low_TF, "PakuAK_Marblez", 12,26,10,1.0, 3, shift);
+
+  if(curUp==EMPTY_VALUE) {bb_macd_signal=-1;}
+  if(curDown==EMPTY_VALUE) {bb_macd_signal=1;}
+  return bb_macd_signal;
+}
+
+int getBBmacdCrossSignal(string name){
+  int bb_macd_signal = 0;
+  double preValue,curValue;
+  double preUp= iCustom( NULL, Low_TF, "PakuAK_Marblez", 12,26,10,1.0, 0, 1+shift);
+  double preDown = iCustom( NULL, Low_TF, "PakuAK_Marblez", 12,26,10,1.0, 1, 1+shift);
+  double preUpBand = iCustom( NULL, Low_TF, "PakuAK_Marblez", 12,26,10,1.0, 2, 1+shift);
+  double preDownBand = iCustom( NULL, Low_TF, "PakuAK_Marblez", 12,26,10,1.0, 3, 1+shift);
+
+  if(preUp==EMPTY_VALUE) preValue = preDown;
+  if(preDown==EMPTY_VALUE) preValue = preUp;
+
+  double curUp= iCustom( NULL, Low_TF, "PakuAK_Marblez", 12,26,10,1.0, 0, shift);
+  double curDown = iCustom( NULL, Low_TF, "PakuAK_Marblez", 12,26,10,1.0, 1, shift);
+  double curUpBand = iCustom( NULL, Low_TF, "PakuAK_Marblez", 12,26,10,1.0, 2, shift);
+  double curDownBand = iCustom( NULL, Low_TF, "PakuAK_Marblez", 12,26,10,1.0, 3, shift);
+
+  if(curUp==EMPTY_VALUE) curValue = curDown;
+  if(curDown==EMPTY_VALUE) curValue = curUp;
+
+  if(preValue > 0 && curValue > 0){
+    if(curValue > curUpBand && preValue < preUpBand){
+      bb_macd_signal=1;
+    }
+  }
+
+  if(preValue < 0 && curValue < 0){
+    if(curValue < curDownBand && preValue > preDownBand){
+      bb_macd_signal=-1;
+    }
+  }
+  return bb_macd_signal;
+}
+
+// Ichomu + Machannal
+int getSignalStrategy1(string name){
+  //Lower TF ichimoku
+  int ichomuTrendLowTF = getIchomuTrendSignal(name);
+
+  // Two MA channels
+  int maChannelCross = getMaChannalSignal(name);
+  //--- Signals
+
+  int signal_1 = 0, signal_2 = 0;
+   
+  if ( ichomuTrendLowTF == 1 && maChannelCross == 1) signal_1 = 1;
+  if ( ichomuTrendLowTF == -1 && maChannelCross == -1) signal_1 = -1;
+
+  signal_2 = signal_1;
+  if (r_signal) signal_2 = -signal_1;
+  return signal_2;
+}
+
+// Ichomu + Machannal + BB_macd
+int getSignalStrategy2(string name){
+
+  //Lower TF ichimoku
+  int ichomuTrendLowTF = getIchomuTrendSignal(name);
+
+  // Two MA channels
+  int maChannelCross = getMaChannalSignal(name);
+
+  // BB macd current value 
+  int bb_macd_signal = getBBmacdValueSignal(name);
+  //--- Signals
+
+  int signal_1 = 0, signal_2 = 0;
+   
+  if ( ichomuTrendLowTF == 1 && maChannelCross == 1 && bb_macd_signal==1) signal_1 = 1;
+  if ( ichomuTrendLowTF == -1 && maChannelCross == -1 && bb_macd_signal==-1) signal_1 = -1;
+
+  signal_2 = signal_1;
+  if (r_signal) signal_2 = -signal_1;
+  return signal_2;
+}
+// BB_macd
+int getSignalStrategy3(string name){
+  //Lower TF ichimoku
+  //int ichomuTrendLowTF = getIchomuTrendSignal(name);
+
+  int bb_macd_signal = getBBmacdCrossSignal(name);
+
+  // Two MA channels
+  int maChannelCross = getMaChannalSignal(name);
+  //--- Signals
+
+  int signal_1 = 0, signal_2 = 0;
+   
+  if ( bb_macd_signal == 1 && maChannelCross == 1) signal_1 = 1;
+  if ( bb_macd_signal == -1 && maChannelCross == -1) signal_1 = -1;
+
+  signal_2 = signal_1;
+  if (r_signal) signal_2 = -signal_1;
+  return signal_2;
+}
+
+int getSignalStrategy4(string name)
+  {
+
+   int bb_macd_signal=getBBmacdValueSignal(name);
+// Two MA channels
+   int maChannelCross=getMaChannalCrossSignal(name);
+   int ichomuSignal=getIchomuTrendSignal(name);
+//--- Signals
+
+   int signal_1=0,signal_2=0;
+
+   if( bb_macd_signal == 1 && maChannelCross == 1 && ichomuSignal==1) signal_1 = 1;
+   if( bb_macd_signal == -1 && maChannelCross == -1 && ichomuSignal==-1) signal_1 = -1;
+
+   signal_2=signal_1;
+   if(r_signal) signal_2=-signal_1;
+   return signal_2;
+  }
+
+int getSignalStrategy5(string name)
+  {
+
+   int macd_signal=getMacdCrossSignal(name);
+// Two MA channels
+   //int maChannelCross=getMaChannalCrossSignal(name);
+   //int ichomuSignal=getIchomuTrendSignal(name);
+//--- Signals
+
+   int signal_1=0,signal_2=0;
+
+   if( macd_signal == 1 ) signal_1 = 1;
+   if( macd_signal == -1 ) signal_1 = -1;
+
+   signal_2=signal_1;
+   if(r_signal) signal_2=-signal_1;
+   return signal_2;
+  }
+
+int getExitSignal(string name){
+  
+  // Two MA channels
+  // int maChannelCross = 0;
+  // double maHigh = iMA( name, Low_TF, MaPeriod, MaShift, MaMode, PRICE_HIGH, shift);
+  // double maLow = iMA( name, Low_TF, MaPeriod, MaShift, MaMode, PRICE_LOW, shift);
+  // double haClose = iCustom(name, Low_TF, "Heiken Ashi", 0,0,0,0, 3, shift);
+  // if(haClose > maHigh) maChannelCross = 1;
+  // if(haClose < maLow) maChannelCross = -1;
+  
+  return getMaChannalSignal(name);
+}
+
+void open_buy(string name){
+  int result = 0;
+  double mlots = getOrderLots(name);
+  string long_comment = "HA_SMA-long on strategy_" + IntegerToString(strategy);
+  result=OrderSend(name,OP_BUY,mlots,MarketInfo(name, MODE_ASK),Slippage,0,0,long_comment,MagicNumber,0,Turquoise);
+  if(result>0){
+    //log("IchomuA=="+IchomuA + " IchomuB==" + IchomuB + " Close[shift]==>"+Close[shift] + "ichomuTrend=="+ichomuTrend);
+    double TP = 0, SL = 0;
+    double SLp = 0, TPp = 0,  TSp = 0; 
+    calculateStopLoss(name,SLp, TPp, TSp);
+    if(TPp>0) TP=MarketInfo(name, MODE_ASK)+TPp;
+    if(SLp>0) SL=MarketInfo(name, MODE_ASK)-SLp;
+    bool success=false;
+    int retry = 0;
+    if(OrderSelect(result,SELECT_BY_TICKET))
+    while(!success && retry < 4){
+      success = OrderModify(OrderTicket(),OrderOpenPrice(),NormalizeDouble(SL,(int)MarketInfo(name, MODE_DIGITS))
+        ,NormalizeDouble(TP,(int)MarketInfo(name, MODE_DIGITS)),0,Green);
+      retry++;
+    }
+  }
+}
+
+void open_sell(string name){
+  int result = 0;
+  double mlots = getOrderLots(name);
+  string short_comment = "HA_SMA-short on strategy_" + IntegerToString(strategy);
+  result=OrderSend(name,OP_SELL,mlots,MarketInfo(name, MODE_BID),Slippage,0,0,short_comment,MagicNumber,0,Magenta);
+  if(result>0){
+    //Comment("\n   This Bar has already been traded");
+    double TP = 0, SL = 0;
+    double SLp = 0,  TPp = 0,  TSp = 0; 
+    calculateStopLoss(name, SLp, TPp, TSp);
+    if(TPp>0) TP=MarketInfo(name, MODE_BID)-TPp;
+    if(SLp>0) SL=MarketInfo(name, MODE_BID)+SLp;
+    bool success=false;
+    int retry = 0;
+    if(OrderSelect(result,SELECT_BY_TICKET))
+    while(!success && retry < 4){
+      success = OrderModify(OrderTicket(),OrderOpenPrice(),NormalizeDouble(SL,(int)MarketInfo(name, MODE_DIGITS))
+        ,NormalizeDouble(TP,(int)MarketInfo(name, MODE_DIGITS)),0,Green);
+      retry++;
+    }
+  }
+}
+
+bool close_buy(string name){
+  bool success = false;
+  for(int cnt=0;cnt<OrdersTotal();cnt++){
+    if(OrderSelect(cnt, SELECT_BY_POS, MODE_TRADES))
+    if(OrderType()<=OP_SELL && OrderSymbol()==name && OrderMagicNumber()==MagicNumber) {
+      //--- Close long
+      if(OrderType()==OP_BUY){
+        success = OrderClose(OrderTicket(),OrderLots(),OrderClosePrice(),Slippage,Red);
+        return success;
+      }
+    }
+  }
+  return success;
+}
+
+bool close_sell(string name){
+  bool success = false;
+  for(int cnt=0;cnt<OrdersTotal();cnt++){
+    if(OrderSelect(cnt, SELECT_BY_POS, MODE_TRADES))
+    if(OrderType()<=OP_SELL && OrderSymbol()==name && OrderMagicNumber()==MagicNumber){
+      //--- Close Short
+      if(OrderType()==OP_SELL) {
+        success = OrderClose(OrderTicket(),OrderLots(),OrderClosePrice(),Slippage,Red);
+        return success;
+      }
+    }
+  }
+  return success;
+}
+
+void trail_stop(){
+
+  double SLp = 0,  TPp = 0,  TSp = 0; 
+  string name = "";
+  for(int cnt=0;cnt<OrdersTotal();cnt++){
+    if(OrderSelect(cnt, SELECT_BY_POS, MODE_TRADES))
+    if(OrderType()<=OP_SELL && OrderMagicNumber()==MagicNumber){
+      //--- Close long
+      name = OrderSymbol();
+      calculateStopLoss(name, SLp, TPp, TSp);
+      if(OrderType()==OP_BUY){
+        if(TSp>0 && trail_mode==true){                 
+          if(MarketInfo(name,MODE_BID) -OrderOpenPrice()>TSp){
+            if(OrderStopLoss()<MarketInfo(name,MODE_BID)-TSp){
+              OrderModify(OrderTicket(),OrderOpenPrice(),MarketInfo(name,MODE_BID)-TSp,OrderTakeProfit(),0,Turquoise);
+              //return success;
+            }
+          }
+        }
+      }
+      //--- Close Short
+      if(OrderType()==OP_SELL){
+        if(TSp>0 && trail_mode==true){                 
+          if((OrderOpenPrice()-MarketInfo(name,MODE_ASK))>(TSp)){
+            if((OrderStopLoss()>(MarketInfo(name,MODE_ASK)+TSp)) || (OrderStopLoss()==0)){
+              OrderModify(OrderTicket(),OrderOpenPrice(),MarketInfo(name,MODE_ASK)+TSp,OrderTakeProfit(),0,Magenta);
+              //return success;
+            }
+          }
+        }
+      }
+    }
+  }
+  //return success;
+}
+
+double getOrderLots(string name){
+  //--- Money Management
+  double mlots=0;
+  int WinCount = Counta(6,name);
+  int LossCount = Counta(5,name);
+  switch(mm_mode){
+
+    //Martingale
+       case mart: if (OrdersHistoryTotal()!=0) mlots=NormalizeDouble(blots*(MathPow(cator,(LossCount))),2); else mlots = blots; break;
+       
+    //Reversed Martingale
+       case r_mart: if (OrdersHistoryTotal()!=0) mlots=NormalizeDouble(blots*(MathPow(cator,(WinCount))),2); else mlots = blots; break;
+       
+    //Scale after loss (Fixed)
+       case scale: if (OrdersHistoryTotal()!=0) mlots=blots+(f_inc*WinCount); else mlots = blots; break;
+       
+    //Scale after win (Fixed)
+       case r_scale: if (OrdersHistoryTotal()!=0) mlots=blots+(f_inc*LossCount); else mlots = blots; break;
+       
+    //Classic
+       case classic: mlots = blots; break;
+  };
+  return mlots;
+}
+
+void calculateStopLoss(string name, double &SLp, double &TPp, double &TSp){
+
+  double pt = MarketInfo (name, MODE_POINT);
+  double spread = MarketInfo(name, MODE_SPREAD) * pt;
+
+  
+  //--- Max DD calculation
+  //--- ATR for Sl / HiLo MA for SL
+  int atrTf = atr_tf;
+  double atr1 = iATR(name,atrTf,atr_p,0);// Period 15
+  double atr2 = iATR(name,atrTf,2*atr_p,0);// Period 30
+  double atr3 = NormalizeDouble(((atr1+atr2)/2)*atr_x,MarketInfo (name, MODE_DIGITS));// Atr weight 1 in SL?TP/TSL
+  
+  double ma1 = iMA(name,atrTf,atr_p*2,0,MODE_LWMA,PRICE_HIGH,0);// 30 MA High
+  double ma2 = iMA(name,atrTf,atr_p*2,0,MODE_LWMA,PRICE_LOW,0);// 30 Ma Low
+  double ma3 = NormalizeDouble(hilo_x*(ma1 - ma2),MarketInfo (name, MODE_DIGITS));// HiLo weight 0.5 in SL/TP/TSL
+
+  //--- SL & TP calculation 
+  double sl_p1 = NormalizeDouble(pt*sl_p/((1/(Close[0]+(spread/2)))),MarketInfo (name, MODE_DIGITS));
+  SLp = sl_p1 + atr3 + ma3;// (atr15+atr30)/2 + (ma30High-ma30Low)/2
+  TPp = NormalizeDouble(pf*(SLp),MarketInfo (name, MODE_DIGITS)); // 3.5 SLP
+  TSp = NormalizeDouble(tf*(SLp),MarketInfo (name, MODE_DIGITS)); //0.8 SLP
+
+}
+//+------------------------------------------------------------------+
+bool VerifySymbol(string &list[],string yoursymbol)
+  {
+   for(int i=0;i<ArraySize(list);i++)
+     {
+      if(yoursymbol==list[i])
+        {
+         return(true);
+        }
+     }
+   return(false);
+  }
+//+------------------------------------------------------------------+
+//|                                                                  |
+//+------------------------------------------------------------------+
+void Assign28SymbolToList(string &array[])
+  {
+//EURUSD
+//GBPUSD
+//AUDUSD
+//NZDUSD
+//USDCAD
+//USDJPY
+//USDCHF
+   array[0]="EURUSD";
+   array[1]="GBPUSD";
+   array[2]="AUDUSD";
+   array[3]="NZDUSD";
+   array[4]="USDCAD";
+   array[5]="USDJPY";
+   array[6]="USDCHF";
+//EURGBP
+//EURAUD
+//EURNZD
+//EURCAD
+//EURJPY
+//EURCHF
+   array[7]="EURGBP";
+   array[8]="EURAUD";
+   array[9]="EURNZD";
+   array[10]="EURCAD";
+   array[11]="EURJPY";
+   array[12]="EURCHF";
+//GBPAUD
+//GBPNZD
+//GBPCAD
+//GBPJPY
+//GBPCHF
+   array[13]="GBPAUD";
+   array[14]="GBPNZD";
+   array[15]="GBPCAD";
+   array[16]="GBPJPY";
+   array[17]="GBPCHF";
+
+//AUDNZD
+//AUDCAD
+//AUDJPY
+//AUDCHF
+   array[18]="AUDNZD";
+   array[19]="AUDCAD";
+   array[20]="AUDJPY";
+   array[21]="AUDCHF";
+//NZDCAD
+//NZDJPY
+//NZDCHF
+   array[22]="NZDCAD";
+   array[23]="NZDJPY";
+   array[24]="NZDCHF";
+//CHFJPY
+//CADCHF
+//CADJPY
+   array[25]="CHFJPY";
+   array[26]="CADCHF";
+   array[27]="CADJPY";
+  }
+//+------------------------------------------------------------------+
 //----------------------------------------------------------------------------
 
-double sqHeikenAshi(string symbol, int timeframe, string mode, int shift) {
+double sqHeikenAshi(string symbol, int timeframe, string mode) {
    if(symbol == "NULL") {
       if(mode == "Open") {
          return(iCustom(NULL, 0, "Heiken Ashi", 0,0,0,0, 2, shift));
@@ -475,12 +816,12 @@ double sqHeikenAshi(string symbol, int timeframe, string mode, int shift) {
 */
 
 //--- stats
-int getLastOrderOpenTime(){
+int getLastOrderOpenTime(string name){
   int result=0;
   for(int i=0;i<OrdersTotal();i++)
   {
      OrderSelect(i,SELECT_BY_POS ,MODE_TRADES);
-     if (OrderMagicNumber()==MagicNumber && OrderSymbol()==Symbol()) result = OrderOpenTime();
+     if (OrderMagicNumber()==MagicNumber && OrderSymbol()==name) result = OrderOpenTime();
    }
   return (result);
 }
@@ -511,7 +852,7 @@ double Earnings(int shift) {
 
 //--- Key can either be total_win, total_loss, total_profit, total_volume!
 
-double Counta (int key){
+double Counta (int key, string name=NULL){
 
    double count_tot = 0;
    double balance = AccountBalance();
@@ -575,9 +916,9 @@ double Counta (int key){
     {
          if (!OrderSelect(i, SELECT_BY_POS, MODE_HISTORY)) 
         continue;
-         if (OrderMagicNumber() == MagicNumber && OrderSymbol() == Symbol() && OrderProfit()<0) 
+         if (OrderMagicNumber() == MagicNumber && OrderSymbol() == name && OrderProfit()<0) 
         {count_tot++;}
-         if (OrderMagicNumber() == MagicNumber && OrderSymbol() == Symbol() && OrderProfit()>0)
+         if (OrderMagicNumber() == MagicNumber && OrderSymbol() == name && OrderProfit()>0)
           {count_tot=0;}
      }
    break;
@@ -588,9 +929,9 @@ double Counta (int key){
     {
          if (!OrderSelect(i, SELECT_BY_POS, MODE_HISTORY)) 
         continue;
-         if (OrderMagicNumber() == MagicNumber && OrderSymbol() == Symbol() && OrderProfit()<0) 
+         if (OrderMagicNumber() == MagicNumber && OrderSymbol() == name && OrderProfit()<0) 
         {count_tot=0;}
-         if (OrderMagicNumber() == MagicNumber && OrderSymbol() == Symbol() && OrderProfit()>0)
+         if (OrderMagicNumber() == MagicNumber && OrderSymbol() == name && OrderProfit()>0)
           {count_tot++;}
      }
    break;
@@ -719,13 +1060,13 @@ double Counta (int key){
 
 //--- Order Counter to enter only when result = 0
 
-int TotalOrdersCount()
+int TotalOrdersCount(string name=NULL)
 {
   int result=0;
   for(int i=0;i<OrdersTotal();i++)
   {
      OrderSelect(i,SELECT_BY_POS ,MODE_TRADES);
-     if (OrderMagicNumber()==MagicNumber && OrderSymbol()==Symbol()) result++;
+     if (OrderMagicNumber()==MagicNumber && (name==NULL || OrderSymbol()==name)) result++;
    }
   return (result);
 }
@@ -765,36 +1106,36 @@ void HUD()
    ObjectSetInteger(ChartID(),"HUD",OBJPROP_ZORDER,0);
 }
 
-void drawInfo(){
-   string label_name ="displaySignal";
-   if(ObjectFind(label_name)<0) 
-     { 
-      //--- create Label object 
-      ObjectCreate(0,label_name,OBJ_RECTANGLE_LABEL,0,0,0);            
-      //--- set X coordinate 
-      ObjectSetInteger(0,label_name,OBJPROP_XDISTANCE,1); 
-      //--- set Y coordinate 
-      ObjectSetInteger(0,label_name,OBJPROP_YDISTANCE,15);
-      //--- set X size 
-      ObjectSetInteger(0,label_name,OBJPROP_XSIZE,125); 
-      //--- set Y size 
-      ObjectSetInteger(0,label_name,OBJPROP_YSIZE,535);
-      //--- define background color 
-      ObjectSetInteger(0,label_name,OBJPROP_BGCOLOR,clrDarkBlue); 
-      //--- define text for object Label 
-      ObjectSetString(0,label_name,OBJPROP_TEXT,"Cache");    
-      //--- disable for mouse selecting 
-      ObjectSetInteger(0,label_name,OBJPROP_SELECTABLE,0);
-      //--- set the style of rectangle lines 
-      ObjectSetInteger(0,label_name,OBJPROP_STYLE,STYLE_SOLID);
-      //--- define border type 
-      ObjectSetInteger(0,label_name,OBJPROP_BORDER_TYPE,BORDER_FLAT);
-      //--- define border width 
-      ObjectSetInteger(0,label_name,OBJPROP_WIDTH,1); 
-      //--- draw it on the chart 
-      ChartRedraw(0);
-     }
-}
+// void drawInfo(){
+//    string label_name ="displaySignal";
+//    if(ObjectFind(label_name)<0) 
+//      { 
+//       //--- create Label object 
+//       ObjectCreate(0,label_name,OBJ_RECTANGLE_LABEL,0,0,0);            
+//       //--- set X coordinate 
+//       ObjectSetInteger(0,label_name,OBJPROP_XDISTANCE,1); 
+//       //--- set Y coordinate 
+//       ObjectSetInteger(0,label_name,OBJPROP_YDISTANCE,15);
+//       //--- set X size 
+//       ObjectSetInteger(0,label_name,OBJPROP_XSIZE,125); 
+//       //--- set Y size 
+//       ObjectSetInteger(0,label_name,OBJPROP_YSIZE,535);
+//       //--- define background color 
+//       ObjectSetInteger(0,label_name,OBJPROP_BGCOLOR,clrDarkBlue); 
+//       //--- define text for object Label 
+//       ObjectSetString(0,label_name,OBJPROP_TEXT,"Cache");    
+//       //--- disable for mouse selecting 
+//       ObjectSetInteger(0,label_name,OBJPROP_SELECTABLE,0);
+//       //--- set the style of rectangle lines 
+//       ObjectSetInteger(0,label_name,OBJPROP_STYLE,STYLE_SOLID);
+//       //--- define border type 
+//       ObjectSetInteger(0,label_name,OBJPROP_BORDER_TYPE,BORDER_FLAT);
+//       //--- define border width 
+//       ObjectSetInteger(0,label_name,OBJPROP_WIDTH,1); 
+//       //--- draw it on the chart 
+//       ChartRedraw(0);
+//      }
+// }
 
 void Earnings() {
 

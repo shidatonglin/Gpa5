@@ -74,7 +74,7 @@ double sl_p = 0;                                    //Raw pips offset
 
 extern double pf = 20;                             //Targeted profit factor (x times SL)
 
-extern bool trail_mode = false;                      //Enable trailing
+extern bool trail_mode = true;                      //Enable trailing
 extern double tf = 0.8;                             //Trailing factor (x times Sl)
 
 enum mm     {classic        //Classic
@@ -297,7 +297,7 @@ if (Bars != ThisBarTrade ) {// To avoid more order in one bar!
     double curDownBand = iCustom( NULL, Low_TF, "PakuAK_Marblez", 12,26,10,1.0, 3, shift);
 
     if(curUp==EMPTY_VALUE) {bb_macd_signal=-1;}
-    if(curDown==EMPTY_VALUE) {bb_macd_signal=1}
+    if(curDown==EMPTY_VALUE) {bb_macd_signal=1;}
 
     // if(preValue > 0 && curValue > 0){
     //   if(curValue > curUpBand && preValue < preUpBand){
