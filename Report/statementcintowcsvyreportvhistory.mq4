@@ -3,13 +3,21 @@ int m;
 
 int init()
   {
+   
    mPrev=Minute();
    totalPrev = 0;
+   writeHistory();
    return(0);
   }
 //+------------------------------------------------------------------+
 int start()
   {
+      //writeHistory();
+  }
+//+------------------------------------------------------------------+
+
+
+void writeHistory(){
    int i,handle,hstTotal=HistoryTotal();
    m=Minute();
    if(hstTotal!=totalPrev)
@@ -33,5 +41,4 @@ int start()
       totalPrev = hstTotal;
       }
    return(0);
-  }
-//+------------------------------------------------------------------+
+}
