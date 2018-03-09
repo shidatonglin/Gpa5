@@ -1,4 +1,4 @@
-# Gpa5
+﻿# Gpa5
 
 
 Learn mql5:
@@ -110,6 +110,9 @@ https://www.mql5.com/en/articles/217
 https://www.mql5.com/en/code/324
 
 https://www.mql5.com/en/code/301
+
+Strategy modules description
+https://www.mql5.com/en/docs/standardlibrary/expertclasses/csignal
 
 
 
